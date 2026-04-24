@@ -32,6 +32,10 @@ class Settings(BaseSettings):
     # Storage Configuration
     data_dir: str = "data"
     test_images_dir: str = "data/test_images"
+    uploads_dir: str = "storage/uploads"
+    
+    # Database Configuration
+    database_url: str = "sqlite:///data/fitcheck.db"
 
 # Single instance of settings for application-wide use
 settings = Settings()
