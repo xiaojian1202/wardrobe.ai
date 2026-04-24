@@ -33,8 +33,8 @@ PROMPT = """
 Analyze the uploaded fashion image and return ONLY a valid JSON object.
 
 Step 1: Determine if the image contains clothing, footwear, accessories, or fashion inspiration.
-Step 2: If it is NOT a fashion-related item (e.g., a pet, food, electronics, landscape), set "is_clothing" to false and all other fields to "unknown".
-Step 3: If it IS a fashion item, set "is_clothing" to true and extract the attributes.
+Step 2: If it is NOT fashion-related, set "is_clothing" to false and all other fields to "unknown".
+Step 3: If multiple items are present (e.g., a rack, a closet, or an outfit), focus on the MOST PROMINENT or CENTRAL item. If no single item dominates, provide a generalized summary of the collection.
 
 JSON Schema:
 {
@@ -49,6 +49,7 @@ JSON Schema:
 Rules:
 - Be concise.
 - Use "unknown" for unclear fields.
+- If multiple colors exist, list the primary one or "multi-color".
 - No markdown, no commentary.
 """.strip()
 
@@ -109,7 +110,7 @@ def _extract_json_block(raw_text: str) -> dict[str, Any]:
 
 def _build_client() -> tuple[OpenAI, str]:
     """
-    Creates the OpenAI-compatible client using centralized settings.
+    Creates the client using centralized settings.
     """
     base_url = settings.triton_base_url
     if not base_url.endswith("/"):
