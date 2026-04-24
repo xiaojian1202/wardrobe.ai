@@ -16,7 +16,7 @@ class ClothingItem(Base):
     user_id = Column(String, nullable=False, index=True) # Placeholder for auth in future
     
     # Image Storage
-    image_hash = Column(String, nullable=False, unique=True)
+    image_hash = Column(String, nullable=False, index=True)
     file_path = Column(String, nullable=False)
     
     # Extracted Attributes (after verification)
