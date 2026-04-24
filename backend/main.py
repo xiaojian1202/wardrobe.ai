@@ -2,21 +2,22 @@ from fastapi import FastAPI, File, HTTPException, UploadFile, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 
-from pipeline.extract import ExtractionError, extract_attributes
+from pipeline.extract import ExtractionError, extract_attributes, ExtractionResult
 from utils.config import settings
 from utils.storage import save_image_securely
 from database.session import engine, get_db
 from database.models import Base, ClothingItem
+from pydantic import BaseModel
 
 # Initialize database tables
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="FitCheck AI API",
-    version="0.1.0",
-    description="Secure image scanning and wardrobe persistence API.",
+    version="0.2.0",
+    description="Multi-item image scanning and wardrobe persistence API.",
 )
 
 app.add_middleware(
@@ -27,10 +28,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Serve the 'storage' directory as static files
 app.mount("/storage", StaticFiles(directory="storage"), name="storage")
 
 ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp", "image/heic"}
+
+class VerificationRequest(BaseModel):
+    category: str
+    sub_category: str
+    color: str
+    material: str
+    vibe: str
 
 @app.get("/health")
 async def health_check() -> dict[str, str]:
@@ -40,29 +47,32 @@ async def health_check() -> dict[str, str]:
 async def scan_image(
     file: UploadFile = File(...), 
     db: Session = Depends(get_db)
-) -> dict[str, object]:
+):
     """
     1. Validates and saves the image securely.
-    2. Extracts fashion attributes via TritonAI.
-    3. Persists the 'Initial AI Draft' to the database.
+    2. Extracts a list of fashion items via TritonAI.
+    3. Persists each item as a 'Draft' to the database.
     """
     if not file.filename:
         raise HTTPException(status_code=400, detail="An image file is required.")
 
     if file.content_type not in ALLOWED_CONTENT_TYPES:
-        raise HTTPException(
-            status_code=400,
-            detail="Unsupported file type. Use JPEG, PNG, WEBP, or HEIC.",
-        )
+        raise HTTPException(status_code=400, detail="Unsupported file type.")
 
     contents = await file.read()
-    
-    # 1. Save Image Securely (Prevents Path Traversal)
     image_hash, relative_path = save_image_securely(contents, file.filename)
 
-    # 2. Extract Attributes via AI
+    # 1. Deduplication: Check if this image was scanned before
+    existing_items = db.query(ClothingItem).filter(ClothingItem.image_hash == image_hash).all()
+    if existing_items:
+        return {
+            "is_duplicate": True,
+            "items": [item.to_dict() for item in existing_items]
+        }
+
+    # 2. AI Extraction
     try:
-        extracted = extract_attributes(
+        extraction = extract_attributes(
             image_bytes=contents,
             mime_type=file.content_type,
             filename=file.filename,
@@ -70,70 +80,38 @@ async def scan_image(
     except ExtractionError as error:
         raise HTTPException(status_code=502, detail=str(error)) from error
 
-    if not extracted.is_clothing:
+    if not extraction.is_clothing or not extraction.items:
         raise HTTPException(
             status_code=422,
             detail="No clothing detected. Please upload a clear fashion image."
         )
 
-    # 3. Check if this image has already been scanned (Duplicate Prevention)
-    existing_item = db.query(ClothingItem).filter(ClothingItem.image_hash == image_hash).first()
+    # 3. Persist multiple items
+    created_items = []
+    for item_data in extraction.items:
+        new_item = ClothingItem(
+            user_id="guest_user_123",
+            image_hash=image_hash,
+            file_path=relative_path,
+            category=item_data.category,
+            sub_category=item_data.sub_category,
+            color=item_data.color,
+            material=item_data.material,
+            vibe=item_data.vibe,
+            is_verified=False,
+            original_ai_output=item_data.model_dump()
+        )
+        db.add(new_item)
+        created_items.append(new_item)
     
-    if existing_item:
-        # If it exists, return the current state (either draft or verified)
-        return {
-            "id": existing_item.id,
-            "filename": file.filename,
-            "extracted": {
-                "category": existing_item.category,
-                "sub_category": existing_item.sub_category,
-                "color": existing_item.color,
-                "material": existing_item.material,
-                "vibe": existing_item.vibe,
-            },
-            "is_verified": existing_item.is_verified,
-            "message": "Retrieving existing record from closet."
-        }
-
-    # 4. Persist to Database as a new 'Draft'
-    new_item = ClothingItem(
-        user_id="guest_user_123",
-        image_hash=image_hash,
-        file_path=relative_path,
-        category=extracted.category,
-        sub_category=extracted.sub_category,
-        color=extracted.color,
-        material=extracted.material,
-        vibe=extracted.vibe,
-        is_verified=False,
-        original_ai_output=extracted.model_dump()
-    )
-    
-    db.add(new_item)
     db.commit()
-    db.refresh(new_item)
+    for item in created_items:
+        db.refresh(item)
 
     return {
-        "id": new_item.id,
-        "filename": file.filename,
-        "extracted": extracted.model_dump(),
-        "is_verified": new_item.is_verified
+        "is_duplicate": False,
+        "items": [item.to_dict() for item in created_items]
     }
-
-@app.get("/items", response_model=List[dict])
-async def get_items(db: Session = Depends(get_db)):
-    """Fetch all items in the closet (both drafts and verified)."""
-    items = db.query(ClothingItem).all()
-    return [item.to_dict() for item in items]
-
-from pydantic import BaseModel
-
-class VerificationRequest(BaseModel):
-    category: str
-    sub_category: str
-    color: str
-    material: str
-    vibe: str
 
 @app.post("/items/{item_id}/verify")
 async def verify_item(
@@ -141,16 +119,10 @@ async def verify_item(
     request: VerificationRequest,
     db: Session = Depends(get_db)
 ):
-    """
-    Updates a draft item with user-verified attributes and marks it final.
-    This completes the 'User-in-the-Loop' flow.
-    """
     item = db.query(ClothingItem).filter(ClothingItem.id == item_id).first()
-    
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
 
-    # Update attributes with user inputs
     item.category = request.category
     item.sub_category = request.sub_category
     item.color = request.color
@@ -160,20 +132,18 @@ async def verify_item(
     
     db.commit()
     db.refresh(item)
-    
     return {"status": "verified", "item": item.to_dict()}
 
 @app.get("/wardrobe", response_model=List[dict])
 async def get_verified_wardrobe(db: Session = Depends(get_db)):
-    """Returns only verified items for the main Wardrobe gallery."""
     items = db.query(ClothingItem).filter(ClothingItem.is_verified == True).all()
+    return [item.to_dict() for item in items]
+
+@app.get("/items", response_model=List[dict])
+async def get_all_items(db: Session = Depends(get_db)):
+    items = db.query(ClothingItem).all()
     return [item.to_dict() for item in items]
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(
-        "main:app", 
-        host=settings.api_host, 
-        port=settings.api_port, 
-        reload=True
-    )
+    uvicorn.run("main:app", host=settings.api_host, port=settings.api_port, reload=True)
