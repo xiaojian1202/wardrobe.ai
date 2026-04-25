@@ -5,10 +5,11 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 
 from pipeline.extract import ExtractionError, extract_attributes, ExtractionResult
+from pipeline.learning import record_correction, get_user_style_context
 from utils.config import settings
-from utils.storage import save_image_securely
+from utils.storage import save_image_securely, create_item_thumbnail
 from database.session import engine, get_db
-from database.models import Base, ClothingItem
+from database.models import Base, ClothingItem, UserPreference
 from pydantic import BaseModel
 
 # Initialize database tables
@@ -16,9 +17,12 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="FitCheck AI API",
-    version="0.2.0",
-    description="Multi-item image scanning and wardrobe persistence API.",
+    version="0.3.0",
+    description="Intelligent fashion scanner with active learning loop.",
 )
+
+# Placeholder user ID for the assignment (until Auth is added)
+DEFAULT_USER_ID = "guest_user_123"
 
 app.add_middleware(
     CORSMiddleware,
@@ -48,21 +52,13 @@ async def scan_image(
     file: UploadFile = File(...), 
     db: Session = Depends(get_db)
 ):
-    """
-    1. Validates and saves the image securely.
-    2. Extracts a list of fashion items via TritonAI.
-    3. Persists each item as a 'Draft' to the database.
-    """
     if not file.filename:
         raise HTTPException(status_code=400, detail="An image file is required.")
-
-    if file.content_type not in ALLOWED_CONTENT_TYPES:
-        raise HTTPException(status_code=400, detail="Unsupported file type.")
 
     contents = await file.read()
     image_hash, relative_path = save_image_securely(contents, file.filename)
 
-    # 1. Deduplication: Check if this image was scanned before
+    # 1. Deduplication
     existing_items = db.query(ClothingItem).filter(ClothingItem.image_hash == image_hash).all()
     if existing_items:
         return {
@@ -70,27 +66,36 @@ async def scan_image(
             "items": [item.to_dict() for item in existing_items]
         }
 
-    # 2. AI Extraction
+    # 2. FETCH LEARNED CONTEXT (The 'Learning Loop' at work)
+    user_style_notes = get_user_style_context(db, DEFAULT_USER_ID)
+
+    # 3. AI Extraction with Context
     try:
         extraction = extract_attributes(
             image_bytes=contents,
             mime_type=file.content_type,
             filename=file.filename,
+            user_context=user_style_notes # Propagation of user feedback
         )
     except ExtractionError as error:
         raise HTTPException(status_code=502, detail=str(error)) from error
 
     if not extraction.is_clothing or not extraction.items:
-        raise HTTPException(
-            status_code=422,
-            detail="No clothing detected. Please upload a clear fashion image."
-        )
+        reason = extraction.rejection_reason
+        if reason == "multiple_items":
+            msg = "Multiple items detected. Please upload a photo of a single fashion piece for your wardrobe."
+        elif reason == "not_clothing":
+            msg = "This doesn't look like a fashion item. Please upload a clear photo of an individual fashion item."
+        else:
+            msg = "Identification failed. Please ensure the image shows one single fashion item."
+            
+        raise HTTPException(status_code=422, detail=msg)
 
-    # 3. Persist multiple items
+    # 4. Persist multiple items
     created_items = []
     for item_data in extraction.items:
         new_item = ClothingItem(
-            user_id="guest_user_123",
+            user_id=DEFAULT_USER_ID,
             image_hash=image_hash,
             file_path=relative_path,
             category=item_data.category,
@@ -110,7 +115,8 @@ async def scan_image(
 
     return {
         "is_duplicate": False,
-        "items": [item.to_dict() for item in created_items]
+        "items": [item.to_dict() for item in created_items],
+        "learned_context_applied": bool(user_style_notes)
     }
 
 @app.post("/items/{item_id}/verify")
@@ -119,10 +125,17 @@ async def verify_item(
     request: VerificationRequest,
     db: Session = Depends(get_db)
 ):
+    """
+    Saves user truth and records corrections to improve future scans.
+    """
     item = db.query(ClothingItem).filter(ClothingItem.id == item_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
 
+    # RECORD CORRECTION (The 'Learning Loop' capturing feedback)
+    record_correction(db, DEFAULT_USER_ID, item_id, request.model_dump())
+
+    # Update attributes
     item.category = request.category
     item.sub_category = request.sub_category
     item.color = request.color
@@ -139,10 +152,11 @@ async def get_verified_wardrobe(db: Session = Depends(get_db)):
     items = db.query(ClothingItem).filter(ClothingItem.is_verified == True).all()
     return [item.to_dict() for item in items]
 
-@app.get("/items", response_model=List[dict])
-async def get_all_items(db: Session = Depends(get_db)):
-    items = db.query(ClothingItem).all()
-    return [item.to_dict() for item in items]
+@app.get("/debug/preferences")
+async def get_learned_preferences(db: Session = Depends(get_db)):
+    """Debug endpoint to see what the system has learned about the user."""
+    prefs = db.query(UserPreference).filter(UserPreference.user_id == DEFAULT_USER_ID).all()
+    return prefs
 
 if __name__ == "__main__":
     import uvicorn
