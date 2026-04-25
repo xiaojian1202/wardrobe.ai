@@ -5,7 +5,7 @@ import { cn } from '../lib/utils';
 
 export default function Navbar() {
   const navItems = [
-    { to: '/', label: 'Scanner', icon: PlusCircle },
+    { to: '/', label: 'Scan', icon: PlusCircle },
     { to: '/wardrobe', label: 'Wardrobe', icon: LayoutGrid },
   ];
 
@@ -13,11 +13,11 @@ export default function Navbar() {
     <nav className="fixed top-0 left-0 right-0 z-[100] h-20 bg-soft-bg/80 backdrop-blur-xl border-b border-white/20">
       <div className="mx-auto flex h-full max-w-7xl items-center justify-between px-8">
         {/* Brand Anchor - Extruded Slabs */}
-        <NavLink to="/" className="flex items-center gap-3 no-underline group focus-visible:ring-2 focus-visible:ring-soft-accent rounded-xl px-2 py-1">
+        <NavLink to="/" className="flex items-center gap-3 no-underline group focus-visible:ring-2 focus-visible:ring-soft-accent rounded-xl px-2 py-1 text-soft-fg">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-soft-bg shadow-extruded-sm group-hover:scale-105 group-active:scale-95 transition-all duration-300 text-soft-accent">
             <Shirt size={22} strokeWidth={2.5} />
           </div>
-          <span className="text-[19px] font-extrabold tracking-tight text-soft-fg font-display">
+          <span className="text-[19px] font-extrabold tracking-tight font-display">
             Wardrobe.<span className="text-soft-accent">AI</span>
           </span>
         </NavLink>

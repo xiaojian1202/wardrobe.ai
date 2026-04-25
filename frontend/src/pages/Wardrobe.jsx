@@ -1,45 +1,46 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '../services/api';
-import { Shirt, Tag, Palette, Sparkles, Loader2, Search, X, Check, ArrowRight } from 'lucide-react';
+import { Shirt, Tag, Palette, Sparkles, Loader2, Search, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import Button from '../components/ui/Button';
+import StyleDashboard from '../components/StyleDashboard';
 import { cn } from '../lib/utils';
 
 export default function Wardrobe() {
   const [items, setItems] = useState([]);
+  const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   
-  // State for the Detail/Edit Modal
   const [selectedItem, setSelectedItem] = useState(null);
   const [isUpdating, setIsUpdating] = useState(false);
 
-  // Disable background scrolling when modal is open
   useEffect(() => {
     if (selectedItem) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = 'unset';
     }
-    return () => {
-      document.body.style.overflow = 'unset';
-    };
+    return () => { document.body.style.overflow = 'unset'; };
   }, [selectedItem]);
 
-  // Initial Data Fetch
   useEffect(() => {
-    fetchWardrobe();
+    fetchData();
   }, []);
 
-  const fetchWardrobe = async () => {
+  const fetchData = async () => {
     setLoading(true);
     try {
-      const data = await api.getWardrobe();
-      setItems(data);
+      const [wardrobeData, statsData] = await Promise.all([
+        api.getWardrobe(),
+        api.getWardrobeStats()
+      ]);
+      setItems(wardrobeData);
+      setStats(statsData);
     } catch (err) {
-      setError("Atelier database connection failed.");
+      setError("Database connection failed.");
     } finally {
       setLoading(false);
     }
@@ -51,7 +52,7 @@ export default function Wardrobe() {
     try {
       await api.verifyItem(selectedItem.id, selectedItem);
       setSelectedItem(null);
-      await fetchWardrobe(); // Refresh list
+      await fetchData(); 
     } catch (err) {
       alert("Failed to update: " + err.message);
     } finally {
@@ -64,10 +65,19 @@ export default function Wardrobe() {
     item.vibe.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  if (loading) {
+    return (
+      <div className="flex h-[80vh] flex-col items-center justify-center bg-soft-bg">
+        <Loader2 className="animate-spin text-soft-accent mb-6" size={56} strokeWidth={1} />
+        <p className="text-soft-muted font-bold uppercase tracking-[0.3em] text-[10px] animate-pulse">Syncing Wardrobe...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto max-w-7xl px-8 py-20 bg-soft-bg min-h-screen relative">
       {/* Editorial Header */}
-      <header className="flex flex-col md:flex-row md:items-end justify-between mb-24 gap-12">
+      <header className="flex flex-col md:flex-row md:items-end justify-between mb-20 gap-12">
         <div className="space-y-4">
           <motion.h1 
             initial={{ opacity: 0, x: -20 }}
@@ -77,7 +87,7 @@ export default function Wardrobe() {
             The <span className="text-soft-accent not-italic">Wardrobe</span>
           </motion.h1>
           <p className="text-soft-muted font-medium text-lg max-w-md leading-relaxed tracking-tight">
-            {items.length} fashion artifacts preserved. Click to refine.
+            Start your fashion collection today.
           </p>
         </div>
 
@@ -85,7 +95,7 @@ export default function Wardrobe() {
           <div className="relative w-full sm:w-[320px]">
             <input 
               type="text" 
-              placeholder="Search wardrobe..."
+              placeholder="Search items..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full bg-soft-bg shadow-inset rounded-2xl h-14 px-12 text-sm font-bold text-soft-fg focus:shadow-inset-deep focus:ring-2 focus:ring-soft-accent outline-none transition-all placeholder:text-soft-muted/50"
@@ -100,6 +110,9 @@ export default function Wardrobe() {
           </Link>
         </div>
       </header>
+
+      {/* DASHBOARD FEATURE (Aggregation Value-Add) */}
+      <StyleDashboard stats={stats} />
 
       {/* Wardrobe Grid */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-10 sm:gap-14">
@@ -144,12 +157,10 @@ export default function Wardrobe() {
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
               className="relative w-full max-w-4xl bg-soft-bg shadow-extruded rounded-[3rem] overflow-hidden grid lg:grid-cols-[1fr_400px]"
             >
-              {/* Modal Left: Large Preview */}
               <div className="p-8 bg-soft-bg shadow-inset m-6 rounded-[2rem] flex items-center justify-center">
                 <img src={api.getImageUrl(selectedItem.file_path)} className="max-h-[60vh] rounded-2xl shadow-extruded-sm" alt="Selected" />
               </div>
 
-              {/* Modal Right: Controls */}
               <div className="p-10 space-y-10">
                 <div className="flex items-center justify-between">
                   <h2 className="text-3xl font-black font-display text-soft-fg tracking-tight italic">Refine</h2>
@@ -185,12 +196,6 @@ export default function Wardrobe() {
           </div>
         )}
       </AnimatePresence>
-
-      {loading && (
-        <div className="flex h-[40vh] items-center justify-center w-full">
-           <Loader2 className="animate-spin text-soft-accent" size={40} />
-        </div>
-      )}
     </div>
   );
 }

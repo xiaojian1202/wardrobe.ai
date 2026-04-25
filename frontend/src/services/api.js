@@ -63,5 +63,17 @@ export const api = {
       throw new Error(data.detail || 'Failed to fetch wardrobe.');
     }
     return data;
+  },
+
+  /**
+   * Fetches aggregated wardrobe statistics for the dashboard.
+   */
+  async getWardrobeStats() {
+    const response = await fetch(`${BASE_URL}/wardrobe/stats`);
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.detail || 'Failed to fetch statistics.');
+    }
+    return data;
   }
 };
