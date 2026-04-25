@@ -54,12 +54,21 @@ npm run dev
 The system is evaluated against a curated dataset of 50 images, including low-quality mobile shots and non-clothing negative examples.
 
 ### Run Accuracy Audit
-
+The evaluation harness supports targeted testing via CLI flags:
 ```bash
-cd backend
-source venv/bin/activate
+# Run full evaluation
 python eval/harness.py
+
+# Test a single specific image
+python eval/harness.py --file positive_1.jpg
+
+# Test a subset by category (e.g., negative, noisy, positive)
+python eval/harness.py --category negative
+
+# Limit the number of tests to perform
+python eval/harness.py --limit 10
 ```
+
 
 ### Evaluation Definitions
 
