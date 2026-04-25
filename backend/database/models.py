@@ -7,31 +7,26 @@ class Base(DeclarativeBase):
 
 class ClothingItem(Base):
     """
-    SQLAlchemy model for a wardrobe item.
-    Designed for scalability to PostgreSQL and robust security.
+    Simplified SQLAlchemy model for a single-item wardrobe.
     """
     __tablename__ = "clothing_items"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(String, nullable=False, index=True) # Placeholder for auth in future
+    user_id = Column(String, nullable=False, index=True) 
     
-    # Image Storage
     image_hash = Column(String, nullable=False, index=True)
-    file_path = Column(String, nullable=False)
+    file_path = Column(String, nullable=False) 
     
-    # Extracted Attributes (after verification)
-    category = Column(String, nullable=False)
-    sub_category = Column(String, nullable=False)
-    color = Column(String, nullable=False)
-    material = Column(String, nullable=False)
-    vibe = Column(String, nullable=False)
+    category = Column(String, nullable=True)
+    sub_category = Column(String, nullable=True)
+    color = Column(String, nullable=True)
+    material = Column(String, nullable=True)
+    vibe = Column(String, nullable=True)
     
-    # Learning Loop Data
     is_verified = Column(Boolean, default=False)
-    original_ai_output = Column(JSON, nullable=True) # Tracks corrections for AI learning
+    original_ai_output = Column(JSON, nullable=True)
 
     def to_dict(self):
-        """Helper to convert to a dictionary for API responses."""
         return {
             "id": self.id,
             "category": self.category,
@@ -42,3 +37,13 @@ class ClothingItem(Base):
             "is_verified": self.is_verified,
             "file_path": self.file_path
         }
+
+class UserPreference(Base):
+    __tablename__ = "user_preferences"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(String, nullable=False, index=True)
+    context_key = Column(String, nullable=False)
+    original_value = Column(String, nullable=False)
+    corrected_value = Column(String, nullable=False)
+    occurrence_count = Column(Integer, default=1)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
