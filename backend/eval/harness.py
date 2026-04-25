@@ -2,6 +2,8 @@ import os
 import sys
 import time
 import json
+import argparse
+import random
 from pathlib import Path
 
 # Add the parent directory to path so we can import pipeline
@@ -10,101 +12,111 @@ sys.path.append(str(Path(__file__).parent.parent))
 from pipeline.extract import extract_attributes, ExtractionError
 from utils.config import settings
 
-def run_evaluation(data_dir: str):
+def run_evaluation(data_dir: str, file_filter: str = None, category_filter: str = None, limit: int = None):
     image_folder = Path(data_dir)
     gold_file = image_folder / "metadata.json"
     
     if not gold_file.exists():
-        print(f"Error: metadata.json not found. Run label_data.py first.")
+        print(f"Error: metadata.json not found.")
         return
 
     with open(gold_file, "r") as f:
         gold_set = json.load(f)
 
-    images = sorted(list(image_folder.glob("*.jpg")))
-    
-    print(f"\n--- Evaluation Harness ---")
+    # 1. Discover and Filter Images
+    all_images = sorted(list(image_folder.glob("*.jpg")))
+    images_to_test = []
+
+    for img in all_images:
+        # Handle single file flag
+        if file_filter and img.name != file_filter:
+            continue
+        # Handle category flag (e.g., 'negative' or 'positive')
+        if category_filter and category_filter not in img.name:
+            continue
+        images_to_test.append(img)
+
+    # 2. Handle random selection if limit is set
+    if limit and limit < len(images_to_test):
+        print(f"--- Randomly selecting {limit} images for this run ---")
+        images_to_test = random.sample(images_to_test, limit)
+    elif not file_filter: # Only sort if we aren't picking a specific file
+        images_to_test = sorted(images_to_test)
+
+    if not images_to_test:
+        print(f"No matching images found for filters.")
+        return
+
+    print(f"\n--- FitCheck AI [PERFORMANCE AUDIT] ---")
+    print(f"Testing {len(images_to_test)} images")
     print("-" * 85)
     
-    stats = {
-        "tech_success": 0,
-        "tp": 0, # True Positive: Correctly identified single item
-        "tn": 0, # True Negative: Correctly rejected non-clothing or outfit
-        "fp": 0, # False Positive: Accepted a non-clothing or outfit
-        "fn": 0, # False Negative: Rejected a valid single item
-        "semantic_error": 0, # Found item but wrong category
-        "total_items": 0
-    }
+    stats = {"tp": 0, "tn": 0, "fp": 0, "fn": 0, "err": 0, "tech": 0}
     
-    total = len(images)
-
-    for img_path in images:
+    for img_path in images_to_test:
         name = img_path.name
         truth = gold_set.get(name)
         if not truth: continue
 
-        print(f"Testing {name:20}", end=" ", flush=True)
+        print(f"{name:20}", end=" ", flush=True)
         
         try:
             with open(img_path, "rb") as f:
                 img_bytes = f.read()
             
-            # Use extraction pipeline
             result = extract_attributes(img_bytes, "image/jpeg", name)
-            stats["tech_success"] += 1
-            stats["total_items"] += len(result.items)
+            stats["tech"] += 1
             
             is_fashion = result.is_clothing
-            truth_is_fashion = truth["expected_is_clothing"]
+            truth_fashion = truth["expected_is_clothing"]
             
-            # --- CASE 1: Expecting a REJECT (Non-clothing or Outfit/Rack) ---
-            if not truth_is_fashion:
+            if not truth_fashion:
                 if not is_fashion:
                     stats["tn"] += 1
                     status = "TRUE NEGATIVE (🚫 Correct Reject)"
                 else:
                     stats["fp"] += 1
-                    status = "FALSE POSITIVE (⚠️ Failed to Reject)"
-            
-            # --- CASE 2: Expecting a SUCCESS (Single Fashion Item) ---
+                    status = "FALSE POSITIVE (⚠️ Hallucination)"
             else:
                 if not is_fashion:
                     stats["fn"] += 1
                     status = f"FALSE NEGATIVE (❌ Missed: {result.rejection_reason})"
                 else:
-                    # Check for category match
                     expected = truth["expected_category"].lower()
-                    # In single-item mode, we check the first (and only) item
-                    if result.items:
-                        actual = result.items[0].category.lower()
-                        if expected == actual or expected in actual:
-                            stats["tp"] += 1
-                            status = "TRUE POSITIVE (✅ Perfect Match)"
-                        else:
-                            stats["semantic_error"] += 1
-                            status = f"SEMANTIC ERROR (❌ Wrong Cat: {actual})"
+                    actual = result.items[0].category.lower() if result.items else "none"
+                    if expected == actual or expected in actual:
+                        stats["tp"] += 1
+                        status = "TRUE POSITIVE (✅ Perfect Match)"
                     else:
-                        stats["fn"] += 1
-                        status = "FALSE NEGATIVE (❌ No items returned)"
+                        stats["err"] += 1
+                        status = f"SEMANTIC ERROR (❌ Wrong Cat: {actual})"
 
             print(f"| {status}")
-
+        except KeyboardInterrupt:
+            print("\n\n🛑 Evaluation stopped by user.")
+            sys.exit(0)
         except Exception as e:
-            print(f"| 🚨 TECHNICAL CRASH")
+            print(f"| 🚨 CRASH: {str(e)[:20]}")
         
         time.sleep(0.5)
 
-    positives = sum(1 for img in gold_set.values() if img["expected_is_clothing"])
-    negatives = total - positives
-
     print("\n" + "═" * 85)
-    print(f"True Positives (Match):  {stats['tp']:2d} / {positives:2d} (Correct identification)")
-    print(f"True Negatives (Reject): {stats['tn']:2d} / {negatives:2d} (Correct rejections)")
+    print(" Results")
+    print("═" * 85)
+    print(f"True Positives (Match):  {stats['tp']}      (Correct identification)")
+    print(f"True Negatives (Reject): {stats['tn']}      (Correct rejections)")
     print("-" * 85)
-    print(f"False Positives:         {stats['fp']:2d}      (Accepted junk/outfits)")
-    print(f"False Negatives:         {stats['fn']:2d}      (Rejected valid items)")
-    print(f"Semantic Errors:         {stats['semantic_error']:2d}      (Wrong category)")
+    print(f"False Positives:         {stats['fp']}      (Missed fake clothes)")
+    print(f"False Negatives:         {stats['fn']}      (Missed real clothes)")
+    print(f"Semantic Errors:         {stats['err']}      (Wrong category)")
     print("═" * 85 + "\n")
 
 if __name__ == "__main__":
-    run_evaluation(settings.test_images_dir)
+    parser = argparse.ArgumentParser(description="FitCheck AI Evaluation Harness")
+    parser.add_argument("--file", type=str, help="Evaluate a single image file (e.g., positive_1.jpg)")
+    parser.add_argument("--category", type=str, help="Filter by category (e.g., 'negative', 'positive', 'noisy')")
+    parser.add_argument("--limit", type=int, help="Limit the number of images to test")
+    parser.add_argument("--dir", type=str, default=settings.test_images_dir, help="Directory containing test images")
+    
+    args = parser.parse_args()
+    run_evaluation(args.dir, file_filter=args.file, category_filter=args.category, limit=args.limit)
