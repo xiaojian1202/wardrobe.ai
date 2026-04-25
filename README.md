@@ -1,76 +1,59 @@
-# FitCheck AI (Document Scanner Assignment)
+# Wardrobe.AI
 
-This project is built for the [UCSD CSE 115/215 Document Scanner Assignment](https://ucsd-cse-115-215.github.io/sp26/assignments/doc-scanner-assignment.html).
+Wardrobe.AI is an intelligent digital wardrobe cataloger designed for Gen-Z users. It transforms raw clothing photos into a structured digital collection using multi-modal Generative AI (UCSD TritonGPT).
 
-FitCheck AI is a full-stack image scanning app for clothing analysis.
+---
 
-- **Backend:** FastAPI (`backend/`)
-- **Frontend:** Vite + React + Tailwind CSS (`frontend/`)
-- **AI Extraction:** UCSD TritonGPT API (OpenAI-compatible)
+## 🌟 Key Features
 
-## Prerequisites
+- **Single-Item Extraction:** Fashion metadata extraction (Category, Material, Vibe) optimized for single-piece cataloging.
+- **Active Learning Loop:** The system detects user corrections and propagates them to future AI prompts, personalizing the extraction vocabulary over time.
+- **User Preference:** Interactive verification where users can refine AI drafts before they enter the wardrobe.
+- **Secure Persistence:** SHA-256 image hashing to prevent Path Traversal and ensure storage deduplication.
+- **Performance Evaluation:** Integrated CLI test harness for accuracy scoring against canonical taxonomies.
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
 
 - Python 3.11+
-- Node.js 18+ and npm
-- A Triton AI API key
+- Node.js 18+
+- Triton AI API Key (configured in `backend/.env`)
 
-## 1) Project Setup
-
-```bash
-git clone <your-repo-url>
-cd fitcheck-ai
-```
-
-### Backend setup (FastAPI)
+### 1. Backend Setup (FastAPI)
 
 ```bash
 cd backend
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
+
+# Initializing the database (Required for first run)
+python reinit_db.py
+
+# Running the server
+python main.py
 ```
 
-Create `backend/.env` (Note: `.env` is ignored by git):
-
-```env
-TRITON_API_KEY=your_api_key_here
-TRITON_BASE_URL=https://tritonai-api.ucsd.edu/v1
-TRITON_MODEL=model_name_here
-```
-
-Frontend setup (Vite + React)
+### 2. Frontend Setup (React + Vite)
 
 ```bash
 cd frontend
 npm install
-```
-
-## 2) Running the App
-
-### Start Backend
-
-```bash
-cd backend
-source venv/bin/activate
-python main.py
-```
-
-*Backend runs at `http://localhost:8000`*
-
-### Start Frontend
-
-```bash
-cd frontend
 npm run dev
 ```
 
-*Frontend runs at `http://localhost:5173`*
+*App is available at [http://localhost:5173](http://localhost:5173)*
 
-## 3) Testing & Evaluation
+---
 
-### Automated Test Harness
+## 📊 Performance & Evaluation
 
-The assignment requires an automated evaluation. Run it via:
+The system is evaluated against a curated dataset of 50 images, including low-quality mobile shots and non-clothing negative examples.
+
+### Run Accuracy Audit
 
 ```bash
 cd backend
@@ -78,23 +61,20 @@ source venv/bin/activate
 python eval/harness.py
 ```
 
-### Manual Testing
+### Evaluation Definitions
 
-1. Open `http://localhost:5173`.
-2. Upload a clothing-related image (JPEG/PNG/WEBP/HEIC).
-3. Click **Start Scan**.
-4. Review, edit, and click **Verify**.
+- **True Positive:** Correctly identified a single clothing item.
+- **True Negative:** Correctly rejected a non-clothing item or a complex outfit.
+- **False Positive:** Incorrectly accepted a non-clothing item (Hallucination).
+- **Semantic Error:** Both agreed it was clothing, but AI assigned the wrong category.
 
-## Project Structure
+---
 
-- `backend/pipeline/`: AI extraction logic and normalization.
-- `backend/utils/config.py`: Centralized Pydantic settings.
-- `backend/eval/`: Independent test harness for evaluation.
-- `frontend/src/services/api.js`: Abstracted API interaction logic.
+## 📁 Project Structure
 
-## Troubleshooting
-
-- **Connection Error:** Ensure `TRITON_API_KEY` is valid and you have a stable internet connection.
-- **Invalid Format:** Ensure the image is JPEG, PNG, WEBP, or HEIC.
-- **Non-Clothing Rejected:** The AI is trained to reject non-fashion items (e.g., pets, food).
+- `backend/pipeline/`: AI extraction and Active Learning logic.
+- `backend/database/`: SQLAlchemy models and session management.
+- `backend/eval/`: Evaluation harness and data collection scripts.
+- `frontend/src/pages/`: Modular Scanner (Home) and Collection (Wardrobe) views.
+- `transcripts/`: Documentation of AI agent development sessions.
 
