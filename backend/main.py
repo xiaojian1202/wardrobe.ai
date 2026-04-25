@@ -158,6 +158,31 @@ async def get_learned_preferences(db: Session = Depends(get_db)):
     prefs = db.query(UserPreference).filter(UserPreference.user_id == DEFAULT_USER_ID).all()
     return prefs
 
+@app.get("/wardrobe/stats")
+async def get_wardrobe_stats(db: Session = Depends(get_db)):
+    """Aggregates data for the Style Persona dashboard."""
+    items = db.query(ClothingItem).filter(ClothingItem.is_verified == True).all()
+    
+    if not items:
+        return {"total": 0, "top_vibe": "None", "top_color": "None", "top_category": "None"}
+        
+    # Simple aggregation logic
+    vibes = {}
+    colors = {}
+    categories = {}
+    
+    for item in items:
+        vibes[item.vibe] = vibes.get(item.vibe, 0) + 1
+        colors[item.color] = colors.get(item.color, 0) + 1
+        categories[item.category] = categories.get(item.category, 0) + 1
+        
+    return {
+        "total": len(items),
+        "top_vibe": max(vibes, key=vibes.get) if vibes else "None",
+        "top_color": max(colors, key=colors.get) if colors else "None",
+        "top_category": max(categories, key=categories.get) if categories else "None"
+    }
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host=settings.api_host, port=settings.api_port, reload=True)
