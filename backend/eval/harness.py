@@ -15,7 +15,7 @@ def run_evaluation(data_dir: str):
     gold_file = image_folder / "metadata.json"
     
     if not gold_file.exists():
-        print(f"Error: Run label_data.py first.")
+        print(f"Error: metadata.json not found. Run label_data.py first.")
         return
 
     with open(gold_file, "r") as f:
@@ -23,10 +23,19 @@ def run_evaluation(data_dir: str):
 
     images = sorted(list(image_folder.glob("*.jpg")))
     
-    print(f"\n--- FitCheck AI [CANONICAL EVALUATION] ---")
-    print("-" * 75)
+    print(f"\n--- Evaluation Harness ---")
+    print("-" * 85)
     
-    stats = {"tech": 0, "domain": 0, "semantic": 0, "fails": 0}
+    stats = {
+        "tech_success": 0,
+        "tp": 0, # True Positive: Correctly identified single item
+        "tn": 0, # True Negative: Correctly rejected non-clothing or outfit
+        "fp": 0, # False Positive: Accepted a non-clothing or outfit
+        "fn": 0, # False Negative: Rejected a valid single item
+        "semantic_error": 0, # Found item but wrong category
+        "total_items": 0
+    }
+    
     total = len(images)
 
     for img_path in images:
@@ -34,48 +43,68 @@ def run_evaluation(data_dir: str):
         truth = gold_set.get(name)
         if not truth: continue
 
-        print(f"{name:20}", end=" ", flush=True)
+        print(f"Testing {name:20}", end=" ", flush=True)
         
         try:
             with open(img_path, "rb") as f:
                 img_bytes = f.read()
             
+            # Use extraction pipeline
             result = extract_attributes(img_bytes, "image/jpeg", name)
-            stats["tech"] += 1
+            stats["tech_success"] += 1
+            stats["total_items"] += len(result.items)
             
-            is_correct_domain = result.is_clothing == truth["expected_is_clothing"]
-            if is_correct_domain: stats["domain"] += 1
+            is_fashion = result.is_clothing
+            truth_is_fashion = truth["expected_is_clothing"]
             
-            status = "N/A"
-            if truth["expected_is_clothing"]:
-                expected = truth["expected_category"]
-                # Match if expected category is in ANY of the AI's extracted items
-                found = any(expected == item.category.lower() for item in result.items)
-                
-                if found:
-                    stats["semantic"] += 1
-                    status = "✅ MATCH"
+            # --- CASE 1: Expecting a REJECT (Non-clothing or Outfit/Rack) ---
+            if not truth_is_fashion:
+                if not is_fashion:
+                    stats["tn"] += 1
+                    status = "TRUE NEGATIVE (🚫 Correct Reject)"
                 else:
-                    ai_cats = [it.category for it in result.items]
-                    status = f"❌ MISS (AI: {', '.join(ai_cats)})"
+                    stats["fp"] += 1
+                    status = "FALSE POSITIVE (⚠️ Failed to Reject)"
+            
+            # --- CASE 2: Expecting a SUCCESS (Single Fashion Item) ---
             else:
-                status = "🚫 REJECTED" if is_correct_domain else "⚠️ FALSE POSITIVE"
+                if not is_fashion:
+                    stats["fn"] += 1
+                    status = f"FALSE NEGATIVE (❌ Missed: {result.rejection_reason})"
+                else:
+                    # Check for category match
+                    expected = truth["expected_category"].lower()
+                    # In single-item mode, we check the first (and only) item
+                    if result.items:
+                        actual = result.items[0].category.lower()
+                        if expected == actual or expected in actual:
+                            stats["tp"] += 1
+                            status = "TRUE POSITIVE (✅ Perfect Match)"
+                        else:
+                            stats["semantic_error"] += 1
+                            status = f"SEMANTIC ERROR (❌ Wrong Cat: {actual})"
+                    else:
+                        stats["fn"] += 1
+                        status = "FALSE NEGATIVE (❌ No items returned)"
 
             print(f"| {status}")
 
         except Exception as e:
-            print(f"| 🚨 FAIL: {str(e)[:40]}")
-            stats["fails"] += 1
+            print(f"| 🚨 TECHNICAL CRASH")
         
         time.sleep(0.5)
 
     positives = sum(1 for img in gold_set.values() if img["expected_is_clothing"])
-    print("\n" + "=" * 75)
-    print(f"FINAL SCORECARD (DeepFashion Taxonomy)")
-    print(f"Domain Accuracy:   {(stats['domain']/total)*100:.1f}%")
-    print(f"Semantic Accuracy: {(stats['semantic']/positives)*100:.1f}%")
-    print(f"Reliability:       {(stats['tech']/total)*100:.1f}%")
-    print("=" * 75 + "\n")
+    negatives = total - positives
+
+    print("\n" + "═" * 85)
+    print(f"True Positives (Match):  {stats['tp']:2d} / {positives:2d} (Correct identification)")
+    print(f"True Negatives (Reject): {stats['tn']:2d} / {negatives:2d} (Correct rejections)")
+    print("-" * 85)
+    print(f"False Positives:         {stats['fp']:2d}      (Accepted junk/outfits)")
+    print(f"False Negatives:         {stats['fn']:2d}      (Rejected valid items)")
+    print(f"Semantic Errors:         {stats['semantic_error']:2d}      (Wrong category)")
+    print("═" * 85 + "\n")
 
 if __name__ == "__main__":
     run_evaluation(settings.test_images_dir)

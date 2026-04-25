@@ -1,0 +1,234 @@
+{
+  "bad_1.jpg": {
+    "expected_is_clothing": false,
+    "expected_category": "upper-body"
+  },
+  "bad_10.jpg": {
+    "expected_is_clothing": false,
+    "expected_category": "accessory"
+  },
+  "bad_11.jpg": {
+    "expected_is_clothing": true,
+    "expected_category": "upper-body"
+  },
+  "bad_12.jpg": {
+    "expected_is_clothing": false,
+    "expected_category": "lower-body"
+  },
+  "bad_13.jpg": {
+    "expected_is_clothing": false,
+    "expected_category": "outfit"
+  },
+  "bad_14.jpg": {
+    "expected_is_clothing": false,
+    "expected_category": "outfit"
+  },
+  "bad_15.jpg": {
+    "expected_is_clothing": false,
+    "expected_category": "outfit"
+  },
+  "bad_2.jpg": {
+    "expected_is_clothing": false,
+    "expected_category": "upper-body"
+  },
+  "bad_3.jpg": {
+    "expected_is_clothing": false,
+    "expected_category": "unknown"
+  },
+  "bad_4.jpg": {
+    "expected_is_clothing": false,
+    "expected_category": "outfit"
+  },
+  "bad_5.jpg": {
+    "expected_is_clothing": false,
+    "expected_category": "upper-body"
+  },
+  "bad_6.jpg": {
+    "expected_is_clothing": false,
+    "expected_category": "upper-body"
+  },
+  "bad_7.jpg": {
+    "expected_is_clothing": false,
+    "expected_category": "outfit"
+  },
+  "bad_8.jpg": {
+    "expected_is_clothing": false,
+    "expected_category": "accessory"
+  },
+  "bad_9.jpg": {
+    "expected_is_clothing": false,
+    "expected_category": "outfit"
+  },
+  "negative_1.jpg": {
+    "expected_is_clothing": false,
+    "expected_category": "unknown"
+  },
+  "negative_10.jpg": {
+    "expected_is_clothing": false,
+    "expected_category": "unknown"
+  },
+  "negative_2.jpg": {
+    "expected_is_clothing": false,
+    "expected_category": "unknown"
+  },
+  "negative_3.jpg": {
+    "expected_is_clothing": false,
+    "expected_category": "unknown"
+  },
+  "negative_4.jpg": {
+    "expected_is_clothing": false,
+    "expected_category": "unknown"
+  },
+  "negative_5.jpg": {
+    "expected_is_clothing": false,
+    "expected_category": "unknown"
+  },
+  "negative_6.jpg": {
+    "expected_is_clothing": false,
+    "expected_category": "unknown"
+  },
+  "negative_7.jpg": {
+    "expected_is_clothing": false,
+    "expected_category": "unknown"
+  },
+  "negative_8.jpg": {
+    "expected_is_clothing": false,
+    "expected_category": "unknown"
+  },
+  "negative_9.jpg": {
+    "expected_is_clothing": false,
+    "expected_category": "unknown"
+  },
+  "noisy_1.jpg": {
+    "expected_is_clothing": true,
+    "expected_category": "upper-body"
+  },
+  "noisy_10.jpg": {
+    "expected_is_clothing": true,
+    "expected_category": "accessory"
+  },
+  "noisy_11.jpg": {
+    "expected_is_clothing": true,
+    "expected_category": "accessory"
+  },
+  "noisy_2.jpg": {
+    "expected_is_clothing": true,
+    "expected_category": "full-body"
+  },
+  "noisy_3.jpg": {
+    "expected_is_clothing": true,
+    "expected_category": "full-body"
+  },
+  "noisy_4.jpg": {
+    "expected_is_clothing": true,
+    "expected_category": "upper-body"
+  },
+  "noisy_5.jpg": {
+    "expected_is_clothing": true,
+    "expected_category": "lower-body"
+  },
+  "noisy_6.jpg": {
+    "expected_is_clothing": true,
+    "expected_category": "footwear"
+  },
+  "noisy_7.jpg": {
+    "expected_is_clothing": true,
+    "expected_category": "lower-body"
+  },
+  "noisy_8.jpg": {
+    "expected_is_clothing": true,
+    "expected_category": "footwear"
+  },
+  "noisy_9.jpg": {
+    "expected_is_clothing": true,
+    "expected_category": "upper-body"
+  },
+  "positive_1.jpg": {
+    "expected_is_clothing": true,
+    "expected_category": "upper-body"
+  },
+  "positive_10.jpg": {
+    "expected_is_clothing": true,
+    "expected_category": "lower-body"
+  },
+  "positive_11.jpg": {
+    "expected_is_clothing": true,
+    "expected_category": "lower-body"
+  },
+  "positive_12.jpg": {
+    "expected_is_clothing": true,
+    "expected_category": "accessory"
+  },
+  "positive_13.jpg": {
+    "expected_is_clothing": true,
+    "expected_category": "accessory"
+  },
+  "positive_14.jpg": {
+    "expected_is_clothing": true,
+    "expected_category": "upper-body"
+  },
+  "positive_15.jpg": {
+    "expected_is_clothing": true,
+    "expected_category": "accessory"
+  },
+  "positive_16.jpg": {
+    "expected_is_clothing": true,
+    "expected_category": "accessory"
+  },
+  "positive_17.jpg": {
+    "expected_is_clothing": true,
+    "expected_category": "accessory"
+  },
+  "positive_18.jpg": {
+    "expected_is_clothing": true,
+    "expected_category": "footwear"
+  },
+  "positive_19.jpg": {
+    "expected_is_clothing": true,
+    "expected_category": "footwear"
+  },
+  "positive_2.jpg": {
+    "expected_is_clothing": true,
+    "expected_category": "upper-body"
+  },
+  "positive_20.jpg": {
+    "expected_is_clothing": true,
+    "expected_category": "footwear"
+  },
+  "positive_21.jpg": {
+    "expected_is_clothing": true,
+    "expected_category": "footwear"
+  },
+  "positive_22.jpg": {
+    "expected_is_clothing": true,
+    "expected_category": "footwear"
+  },
+  "positive_3.jpg": {
+    "expected_is_clothing": true,
+    "expected_category": "upper-body"
+  },
+  "positive_4.jpg": {
+    "expected_is_clothing": true,
+    "expected_category": "upper-body"
+  },
+  "positive_5.jpg": {
+    "expected_is_clothing": true,
+    "expected_category": "full-body"
+  },
+  "positive_6.jpg": {
+    "expected_is_clothing": true,
+    "expected_category": "footwear"
+  },
+  "positive_7.jpg": {
+    "expected_is_clothing": true,
+    "expected_category": "lower-body"
+  },
+  "positive_8.jpg": {
+    "expected_is_clothing": true,
+    "expected_category": "lower-body"
+  },
+  "positive_9.jpg": {
+    "expected_is_clothing": true,
+    "expected_category": "lower-body"
+  }
+}
