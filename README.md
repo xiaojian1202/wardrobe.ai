@@ -1,16 +1,18 @@
 # Wardrobe.AI
 
-Wardrobe.AI is an intelligent digital wardrobe cataloger designed for Gen-Z users. It transforms raw clothing photos into a structured digital collection using multi-modal Generative AI (UCSD TritonGPT).
+Wardrobe.AI is a digital wardrobe cataloger primarily targetted for Gen-Z users. It transforms raw clothing photos into a structured digital collection using multi-modal Generative AI.
+
+**[Watch the Demo Video](https://youtu.be/LGtXzNncL9U)**
 
 ---
 
 ## 🌟 Key Features
 
-- **Single-Item Extraction:** Fashion metadata extraction (Category, Material, Vibe) optimized for single-piece cataloging.
+- **Strict Single-Item Extraction:** Fashion metadata extraction (Category, Material, Vibe) optimized for single-piece cataloging.
 - **Active Learning Loop:** The system detects user corrections and propagates them to future AI prompts, personalizing the extraction vocabulary over time.
-- **User Preference:** Interactive verification where users can refine AI drafts before they enter the wardrobe.
+- **User-in-the-Loop:** Interactive verification station where users can refine AI drafts before they saving to the wardrobe.
 - **Secure Persistence:** SHA-256 image hashing to prevent Path Traversal and ensure storage deduplication.
-- **Performance Evaluation:** Integrated CLI test harness for accuracy scoring against canonical taxonomies.
+- **Professional Performance Audit:** Integrated CLI test harness for accuracy scoring.
 
 ---
 
@@ -30,10 +32,10 @@ python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 
-# Initializing the database (Required for first run)
+# Initializing the database (Required for first run or when database schemas change)
 python reinit_db.py
 
-# Running the server
+# Running the server (make sure to be in backend directory and activate venv)
 python main.py
 ```
 
@@ -54,7 +56,9 @@ npm run dev
 The system is evaluated against a curated dataset of 50 images, including low-quality mobile shots and non-clothing negative examples.
 
 ### Run Accuracy Audit
+
 The evaluation harness supports targeted testing via CLI flags:
+
 ```bash
 # Run full evaluation
 python eval/harness.py
@@ -68,7 +72,6 @@ python eval/harness.py --category negative
 # Limit the number of tests to perform
 python eval/harness.py --limit 10
 ```
-
 
 ### Evaluation Definitions
 
