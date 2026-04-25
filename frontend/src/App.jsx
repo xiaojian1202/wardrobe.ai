@@ -8,7 +8,7 @@ import './App.css';
 function App() {
   return (
     <Router>
-      <div className="min-h-screen bg-slate-950 text-slate-50 selection:bg-fuchsia-500/30">
+      <div className="min-h-screen bg-soft-bg text-soft-fg selection:bg-soft-accent/30 font-body">
         <Navbar />
         <main>
           <Routes>

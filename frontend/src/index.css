@@ -1,39 +1,59 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
-html {
-  color-scheme: dark;
+@theme {
+  /* Colors - Sand & Espresso Neutral Palette */
+  --color-soft-bg: #F2EFE9;
+  --color-soft-fg: #4A443F;
+  --color-soft-muted: #8C847E;
+  --color-soft-accent: #A68E74;
+  --color-soft-accent-light: #C4B29E;
+  --color-soft-secondary: #7A8C74; /* Muted Olive for Success */
+
+  /* Typography */
+  --font-display: "Plus Jakarta Sans", sans-serif;
+  --font-body: "DM Sans", sans-serif;
+
+  /* Radius */
+  --radius-container: 32px;
+
+  /* Shadows (Tuned for Warm Cream Surface) */
+  --shadow-extruded: 10px 10px 20px rgba(190, 185, 175, 0.5), -10px -10px 20px rgba(255, 255, 255, 1);
+  --shadow-extruded-hover: 15px 15px 30px rgba(190, 185, 175, 0.6), -15px -15px 30px rgba(255, 255, 255, 1);
+  --shadow-extruded-sm: 5px 5px 10px rgba(190, 185, 175, 0.5), -5px -5px 10px rgba(255, 255, 255, 1);
+  --shadow-inset: inset 6px 6px 12px rgba(190, 185, 175, 0.5), inset -6px -6px 12px rgba(255, 255, 255, 1);
+  --shadow-inset-deep: inset 12px 12px 24px rgba(190, 185, 175, 0.6), inset -12px -12px 24px rgba(255, 255, 255, 1);
+  --shadow-inset-sm: inset 4px 4px 8px rgba(190, 185, 175, 0.5), inset -4px -4px 8px rgba(255, 255, 255, 1);
+
+  /* Animations */
+  --animate-float: float 3s ease-in-out infinite;
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-10px); }
+  }
 }
 
-body {
-  margin: 0;
-  min-width: 320px;
-  font-family:
-    Inter,
-    system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    sans-serif;
-  background: #020617;
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+@layer base {
+  :root {
+    --background: #F2EFE9;
+    --foreground: #4A443F;
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    @apply font-body min-h-screen antialiased;
+    scroll-behavior: smooth;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display font-bold tracking-tight;
+    color: var(--foreground);
+  }
 }
 
-* {
-  box-sizing: border-box;
-}
-
-button,
-input,
-textarea,
-select {
-  font: inherit;
-}
-
-#root {
-  width: 100%;
+@layer utilities {
+  .neumorphic-focus {
+    @apply ring-2 ring-soft-accent ring-offset-2 ring-offset-soft-bg outline-none;
+  }
 }
