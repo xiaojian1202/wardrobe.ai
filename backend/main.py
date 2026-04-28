@@ -183,6 +183,17 @@ async def get_wardrobe_stats(db: Session = Depends(get_db)):
         "top_category": max(categories, key=categories.get) if categories else "None"
     }
 
+@app.delete("/items/{item_id}")
+async def delete_item(item_id: int, db: Session = Depends(get_db)):
+    """Deletes an item from the database."""
+    item = db.query(ClothingItem).filter(ClothingItem.id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+    
+    db.delete(item)
+    db.commit()
+    return {"status": "deleted", "id": item_id}
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host=settings.api_host, port=settings.api_port, reload=True)

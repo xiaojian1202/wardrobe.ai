@@ -75,5 +75,18 @@ export const api = {
       throw new Error(data.detail || 'Failed to fetch statistics.');
     }
     return data;
+  },
+
+  /**
+   * Deletes an item from the archive.
+   */
+  async deleteItem(itemId) {
+    const response = await fetch(`${BASE_URL}/items/${itemId}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) {
+      throw new Error('Failed to delete item.');
+    }
+    return true;
   }
 };
