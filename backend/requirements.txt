@@ -3,3 +3,9 @@ openai
 pydantic
 python-multipart
 uvicorn
+sqlalchemy
+python-dotenv
+httpx
+pillow
+pillow-heif
+pydantic-settings
