@@ -27,16 +27,35 @@ Wardrobe.AI is a digital wardrobe cataloger primarily targetted for Gen-Z users.
 
 ### 1. Backend Setup (FastAPI)
 
+Navigate to the backend directory and set up your environment:
+
 ```bash
 cd backend
+
+# Create a virtual environment
 python3 -m venv venv
+
+# Activate the virtual environment
+# On macOS/Linux:
 source venv/bin/activate
+# On Windows:
+# venv\Scripts\activate
+
+# Install dependencies
 pip install -r requirements.txt
 
-# Initializing the database (Required for first run or when database schemas change)
+# Configure environment variables
+# Copy the example file and add your credentials
+cp .env.example .env
+```
+
+> **Note:** Open `.env` and replace `your_api_key_here` and `model_name_here` with your actual Triton AI credentials.
+
+```bash
+# Initializing the database
 python reinit_db.py
 
-# Running the server (make sure to be in backend directory and activate venv)
+# Running the server
 python main.py
 ```
 
