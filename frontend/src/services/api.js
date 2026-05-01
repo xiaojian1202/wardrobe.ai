@@ -33,6 +33,28 @@ export const api = {
   },
 
   /**
+   * Scans multiple clothing images and extracts their attributes.
+   * Returns an array of results.
+   */
+  async batchScanImages(files) {
+    const payload = new FormData();
+    for (const file of files) {
+      payload.append('files', file);
+    }
+
+    const response = await fetch(`${BASE_URL}/batch-scan`, {
+      method: 'POST',
+      body: payload,
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.detail || 'Batch scanning failed.');
+    }
+    return data;
+  },
+
+  /**
    * Verifies an item and marks it final in the DB.
    * @param {number} itemId - The database ID of the item.
    * @param {Object} verifiedData - The (potentially edited) attributes.

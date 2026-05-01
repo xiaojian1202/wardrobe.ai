@@ -25,3 +25,4 @@ backend/data/
 
 # OS Clutter
 .DS_Store
+backend/storage/

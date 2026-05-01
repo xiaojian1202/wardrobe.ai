@@ -119,6 +119,89 @@ async def scan_image(
         "learned_context_applied": bool(user_style_notes)
     }
 
+@app.post("/batch-scan")
+async def batch_scan_images(
+    files: List[UploadFile] = File(...), 
+    db: Session = Depends(get_db)
+):
+    """
+    Scans multiple clothing images and returns extracted attributes for each.
+    """
+    results = []
+    user_style_notes = get_user_style_context(db, DEFAULT_USER_ID)
+
+    for file in files:
+        if not file.filename:
+            results.append({"filename": "unknown", "status": "error", "detail": "Filename is missing."})
+            continue
+
+        try:
+            contents = await file.read()
+            image_hash, relative_path = save_image_securely(contents, file.filename)
+
+            # 1. Deduplication
+            existing_items = db.query(ClothingItem).filter(ClothingItem.image_hash == image_hash).all()
+            if existing_items:
+                results.append({
+                    "filename": file.filename,
+                    "status": "duplicate",
+                    "items": [item.to_dict() for item in existing_items]
+                })
+                continue
+
+            # 2. AI Extraction
+            try:
+                extraction = extract_attributes(
+                    image_bytes=contents,
+                    mime_type=file.content_type,
+                    filename=file.filename,
+                    user_context=user_style_notes
+                )
+            except ExtractionError as error:
+                results.append({"filename": file.filename, "status": "error", "detail": str(error)})
+                continue
+
+            if not extraction.is_clothing or not extraction.items:
+                results.append({
+                    "filename": file.filename, 
+                    "status": "error", 
+                    "detail": extraction.rejection_reason or "Not identified as clothing."
+                })
+                continue
+
+            # 3. Persist
+            created_items = []
+            for item_data in extraction.items:
+                new_item = ClothingItem(
+                    user_id=DEFAULT_USER_ID,
+                    image_hash=image_hash,
+                    file_path=relative_path,
+                    category=item_data.category,
+                    sub_category=item_data.sub_category,
+                    color=item_data.color,
+                    material=item_data.material,
+                    vibe=item_data.vibe,
+                    is_verified=False,
+                    original_ai_output=item_data.model_dump()
+                )
+                db.add(new_item)
+                created_items.append(new_item)
+            
+            db.commit()
+            for item in created_items:
+                db.refresh(item)
+
+            results.append({
+                "filename": file.filename,
+                "status": "success",
+                "items": [item.to_dict() for item in created_items]
+            })
+
+        except Exception as e:
+            results.append({"filename": file.filename, "status": "error", "detail": str(e)})
+
+    return results
+
 @app.post("/items/{item_id}/verify")
 async def verify_item(
     item_id: int, 
