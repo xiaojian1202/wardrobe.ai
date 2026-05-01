@@ -8,6 +8,7 @@ Wardrobe.AI is a digital wardrobe cataloger primarily targetted for Gen-Z users.
 
 ## 🌟 Key Features
 
+- **Batch Processing & Sequential Verification:** Support for multi-file uploads with a dedicated "Verification Queue" to streamline high-volume cataloging while maintaining human-in-the-loop quality.
 - **Strict Single-Item Extraction:** Fashion metadata extraction (Category, Material, Vibe) optimized for single-piece cataloging.
 - **Active Learning Loop:** The system detects user corrections and propagates them to future AI prompts, personalizing the extraction vocabulary over time.
 - **User-in-the-Loop:** Interactive verification station where users can refine AI drafts before they saving to the wardrobe.
@@ -102,11 +103,12 @@ python eval/harness.py --limit 10
 
 The programmatic interface between the GUI and the backend is a RESTful API endpoint.
 
-- **URL Route:** `/scan`
+- **URL Routes:** `/scan` (single) and `/batch-scan` (multiple).
 - **HTTP Method:** `POST`
-- **Parameters:** A `file` parameter containing the image, sent as `multipart/form-data`.
-- **API Call:** The frontend (React) calls this via the `api.scanImage(file)` service (found in `frontend/src/services/api.js`), which uses the browser's `fetch` API.
-- **Backend Implementation:** The FastAPI server receives this in `backend/main.py` through the `scan_image` function, which saves the image securely and initiates the AI extraction pipeline.
+- **Parameters:** A `file` (or multiple `files`) parameter containing the image(s), sent as `multipart/form-data`.
+- **API Call:** The frontend (React) calls this via the `api.scanImage(file)` or `api.batchScanImages(files)` services (found in `frontend/src/services/api.js`), which use the browser's `fetch` API.
+- **Backend Implementation:** The FastAPI server receives these in `backend/main.py`. The batch endpoint iterates through the files, initiating the AI extraction pipeline for each and returning a collection of drafts for the frontend's Verification Queue.
+
 
 #### c. User data in the prompt
 
