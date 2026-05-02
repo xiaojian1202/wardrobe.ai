@@ -1,6 +1,17 @@
+import time
 from sqlalchemy.orm import Session
 from database.models import UserPreference, ClothingItem
-from typing import List
+from typing import List, Dict, Any
+
+# Simple in-memory cache with TTL
+# Structure: {user_id: {"context": str, "expiry": float}}
+_STYLE_CONTEXT_CACHE: Dict[str, Dict[str, Any]] = {}
+CACHE_TTL_SECONDS = 300  # 5 minutes
+
+def invalidate_style_cache(user_id: str):
+    """Explicitly removes a user's context from the cache."""
+    if user_id in _STYLE_CONTEXT_CACHE:
+        del _STYLE_CONTEXT_CACHE[user_id]
 
 def record_correction(db: Session, user_id: str, item_id: int, verified_data: dict):
     """
@@ -14,6 +25,7 @@ def record_correction(db: Session, user_id: str, item_id: int, verified_data: di
     # Compare every fashion field
     fields = ['category', 'sub_category', 'color', 'material', 'vibe']
     original = item.original_ai_output
+    changes_made = False
 
     for field in fields:
         orig_val = original.get(field, "").lower().strip()
@@ -21,6 +33,7 @@ def record_correction(db: Session, user_id: str, item_id: int, verified_data: di
 
         # If they differ, we have a correction!
         if orig_val and corr_val and orig_val != corr_val:
+            changes_made = True
             # Check if this preference already exists
             pref = db.query(UserPreference).filter(
                 UserPreference.user_id == user_id,
@@ -46,23 +59,42 @@ def record_correction(db: Session, user_id: str, item_id: int, verified_data: di
                 )
                 db.add(new_pref)
     
-    db.commit()
+    if changes_made:
+        db.commit()
+        invalidate_style_cache(user_id)
 
 def get_user_style_context(db: Session, user_id: str) -> str:
     """
     Fetches established preferences and formats them as a system prompt instruction.
-    Only includes preferences with high confidence (occurrence > 1).
+    Uses an in-memory cache to reduce database load.
     """
+    now = time.time()
+    cached = _STYLE_CONTEXT_CACHE.get(user_id)
+
+    if cached and now < cached["expiry"]:
+        return cached["context"]
+
+    # Cache miss or expired
     prefs = db.query(UserPreference).filter(
         UserPreference.user_id == user_id,
         UserPreference.occurrence_count >= 1 # Lowered to 1 for immediate demo feedback
     ).all()
 
     if not prefs:
+        # Cache the empty result to prevent repeated DB hits for new users
+        _STYLE_CONTEXT_CACHE[user_id] = {"context": "", "expiry": now + CACHE_TTL_SECONDS}
         return ""
 
     context_lines = ["USER-SPECIFIC STYLE PREFERENCES:"]
     for p in prefs:
         context_lines.append(f"- When you see '{p.original_value}', the user prefers you categorize it as '{p.corrected_value}'.")
     
-    return "\n".join(context_lines)
+    context_str = "\n".join(context_lines)
+    
+    # Store in cache
+    _STYLE_CONTEXT_CACHE[user_id] = {
+        "context": context_str,
+        "expiry": now + CACHE_TTL_SECONDS
+    }
+    
+    return context_str
