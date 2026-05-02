@@ -36,13 +36,14 @@ PROMPT = """
 You are a wardrobe cataloger. Your goal is to identify SINGLE clothing items based on the PRIMARY FOCUS of the image.
 
 ### RULES:
-1. PRIMARY FOCUS RULE: If the image clearly focuses on one specific item (by size, framing, or intent), you MUST extract ONLY that item. Ignore incidental or partially visible background items (e.g., ignore pant hems if the focus is clearly on the shoes; ignore a shirt collar if the focus is a jacket).
-2. DEFINITION OF A SINGLE ITEM: A natural pair designed to be worn together (e.g., a pair of shoes, pair of earrings, pair of socks) or a matching set presented as a single logical product (e.g., a jewelry set) MUST be treated as ONE single item.
-3. STRICT OUTFIT REJECTION: If the image contains multiple DISTINCT types of clothing items without a single clear focal point (e.g., a full-body mirror selfie showing a top and bottom equally, or a flat lay of an entire outfit), you MUST set "is_clothing" to false and "rejection_reason" to "multiple_items". We cannot catalog outfits.
-4. REJECTION LOGIC:
-   - If it is an outfit without a clear primary focus, or multiple unrelated items: set "is_clothing": false and "rejection_reason": "multiple_items".
+1. PRIMARY FOCUS RULE: If the image clearly focuses on one specific item (by size, framing, or intent), you MUST extract ONLY that item. Ignore incidental background elements that do not compete for attention (e.g., a tiny bit of a hanger, a distant wall, or blurred-out background objects).
+2. CLUTTER & MULTI-ITEM REJECTION: If the image contains multiple DISTINCT items that are clearly visible and compete for attention (e.g., a pile of accessories, a shelf of shoes, or a cluttered table where items are overlapping or packed together), you MUST set "is_clothing" to false and "rejection_reason" to "multiple_items". We prioritize clean, single-item cataloging over cluttered or busy scenes.
+3. DEFINITION OF A SINGLE ITEM: A natural pair designed to be worn together (e.g., a pair of shoes, pair of earrings, pair of socks) or a matching set presented as a single logical product (e.g., a jewelry set) MUST be treated as ONE single item.
+4. STRICT OUTFIT REJECTION: If the image contains multiple DISTINCT types of clothing items without a single clear focal point (e.g., a full-body mirror selfie showing a top and bottom equally, or a flat lay of an entire outfit), you MUST set "is_clothing" to false and "rejection_reason" to "multiple_items". We cannot catalog outfits.
+5. REJECTION LOGIC:
+   - If it is an outfit, a cluttered scene, or multiple unrelated items: set "is_clothing": false and "rejection_reason": "multiple_items".
    - If non-clothing (pets, food, room): set "is_clothing": false and "rejection_reason": "not_clothing".
-5. ACCEPTANCE: Only accept if the image has ONE clear primary piece of clothing, footwear, accessory, pair, or set.
+6. ACCEPTANCE: Only accept if the image has ONE clear primary piece of clothing, footwear, accessory, pair, or set that is prominently featured and easily distinguishable from any background elements.
 
 ### OUTPUT FORMAT:
 Output ONLY a valid JSON object. Do not include any conversational text or markdown formatting outside the JSON.
@@ -123,6 +124,9 @@ def extract_attributes(image_bytes: bytes, mime_type: str, filename: str, user_c
             model=model_name,
             messages=[{"role": "user", "content": [{"type": "text", "text": full_prompt}, {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"}}]}]
         )
-        return ExtractionResult.model_validate(_extract_json_block(response.choices[0].message.content))
+        try:
+            return ExtractionResult.model_validate(_extract_json_block(response.choices[0].message.content))
+        except Exception as ve:
+            raise ve
     except Exception as error:
         raise ExtractionError(f"Extraction failed: {str(error)}")
