@@ -72,10 +72,12 @@ FALLBACK_VALUES = ExtractionResult(is_clothing=False, items=[])
 def _normalize_to_jpeg(image_bytes: bytes) -> bytes:
     try:
         img = Image.open(BytesIO(image_bytes))
-        img.thumbnail((512, 512), Image.Resampling.LANCZOS) # High-speed thumb
+        # Optimized for token reduction while maintaining extraction accuracy
+        img.thumbnail((384, 384), Image.Resampling.LANCZOS)
         if img.mode != "RGB": img = img.convert("RGB")
         buffer = BytesIO()
-        img.save(buffer, format="JPEG", quality=75)
+        # quality=60 + optimize=True significantly reduces payload size
+        img.save(buffer, format="JPEG", quality=60, optimize=True)
         return buffer.getvalue()
     except Exception as e:
         raise ExtractionError(f"Format failed: {str(e)}")

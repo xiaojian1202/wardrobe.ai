@@ -68,7 +68,8 @@ def create_item_thumbnail(
         storage_dir = BASE_DIR / settings.uploads_dir
         thumb_path = storage_dir / thumb_filename
         
-        cropped_img.convert("RGB").save(thumb_path, "JPEG", quality=85)
+        # Save thumbnail with optimization
+        cropped_img.convert("RGB").save(thumb_path, "JPEG", quality=75, optimize=True)
         
         return os.path.join(settings.uploads_dir, thumb_filename)
     except Exception as e:
