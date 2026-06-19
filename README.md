@@ -2,8 +2,6 @@
 
 Wardrobe.AI is a digital wardrobe cataloger primarily targetted for Gen-Z users. It transforms raw clothing photos into a structured digital collection using multi-modal Generative AI.
 
-**[Watch the Demo Video](https://youtu.be/LGtXzNncL9U)**
-
 ---
 
 ## 🌟 Key Features
@@ -111,28 +109,4 @@ python eval/harness.py --limit 10
 - `transcripts/`: Documentation of AI agent development sessions.
 
 ---
-
-## 📝 Reviewer FAQ
-
-#### a. Summary
-
-**Wardrobe.AI** is a digital wardrobe cataloger designed for Gen-Z users to transform raw clothing photos into a structured digital collection. The project takes **image documents** (JPEG, PNG, WEBP, and HEIC) and presents a **web-based GUI** featuring a "Scanner" for identifying new items and a "Collection" gallery for browsing the verified wardrobe. It extracts structured fashion metadata—including **category, sub-category, color, material, and vibe**—while enforcing a strict "Single-Item" rule to ensure every entry in the digital closet is a high-quality, individual piece.
-
-#### b. GUI/backend interface
-
-The programmatic interface between the GUI and the backend is a RESTful API endpoint.
-
-- **URL Routes:** `/scan` (single) and `/batch-scan` (multiple).
-- **HTTP Method:** `POST`
-- **Parameters:** A `file` (or multiple `files`) parameter containing the image(s), sent as `multipart/form-data`.
-- **API Call:** The frontend (React) calls this via the `api.scanImage(file)` or `api.batchScanImages(files)` services (found in `frontend/src/services/api.js`), which use the browser's `fetch` API.
-- **Backend Implementation:** The FastAPI server receives these in `backend/main.py`. The batch endpoint iterates through the files, initiating the AI extraction pipeline for each and returning a collection of drafts for the frontend's Verification Queue.
-
-
-#### c. User data in the prompt
-
-User data has a direct effect on the extraction prompt through an **Active Learning Loop**.
-
-- **Mechanism:** When a user verifies or corrects the AI-extracted attributes, the system records the difference between the AI's draft and the user's correction in a `user_preferences` table (handled in `backend/pipeline/learning.py`).
-- **Prompt Injection:** In `backend/pipeline/extract.py`, the `extract_attributes` function calls `get_user_style_context`, which fetches these saved corrections and formats them into a "USER-SPECIFIC STYLE PREFERENCES" block. This context is then **templated directly into the top of the system prompt** (e.g., *“When you see 'jacket', the user prefers you categorize it as 'outerwear'”*), allowing the LLM to personalize future extractions based on the user's specific vocabulary and feedback.
 
