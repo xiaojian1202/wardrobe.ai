@@ -5,8 +5,7 @@
             "framework": "vite"
         },
         "backend": {
-            "root": "backend"
-            "framework": "fastapi",
+            "root": "backend",
             "entrypoint": "main.py"
         }
     },
