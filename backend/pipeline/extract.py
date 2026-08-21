@@ -5,10 +5,11 @@ from io import BytesIO
 from typing import Any, List, Optional
 
 import httpx
-from openai import OpenAI, APIConnectionError, APITimeoutError
+from openai import AsyncOpenAI, APIConnectionError, APITimeoutError
 from PIL import Image
 from pillow_heif import register_heif_opener
 from pydantic import BaseModel, ConfigDict, ValidationError
+from starlette.concurrency import run_in_threadpool
 
 # Import the centralized configuration
 from utils.config import settings
@@ -96,25 +97,26 @@ def _extract_json_block(raw_text: str) -> dict[str, Any]:
     
     try:
         # Clean up common LLM artifacts like trailing commas before parsing
-        # (Very basic cleanup, json.loads is still primary)
         cleaned_content = re.sub(r",\s*([\]}])", r"\1", content)
         return json.loads(cleaned_content)
     except json.JSONDecodeError as e:
-        # Final attempt with original content if cleanup failed/was unnecessary
         try:
             return json.loads(content)
         except json.JSONDecodeError:
             raise ExtractionError(f"Malformed JSON: {str(e)}")
 
-def _build_client() -> tuple[OpenAI, str]:
+def _build_client() -> tuple[AsyncOpenAI, str]:
     base_url = settings.triton_base_url
     if not base_url.endswith("/"): base_url += "/"
-    client = OpenAI(api_key=settings.triton_api_key, base_url=base_url, timeout=60.0)
+    client = AsyncOpenAI(api_key=settings.triton_api_key, base_url=base_url, timeout=45.0)
     return client, settings.triton_model
 
-def extract_attributes(image_bytes: bytes, mime_type: str, filename: str, user_context: str = "") -> ExtractionResult:
+async def extract_attributes(image_bytes: bytes, mime_type: str, filename: str, user_context: str = "") -> ExtractionResult:
+    """
+    Asynchronously extracts fashion attributes using non-blocking AsyncOpenAI and threadpool image normalization.
+    """
     try:
-        jpeg_bytes = _normalize_to_jpeg(image_bytes)
+        jpeg_bytes = await run_in_threadpool(_normalize_to_jpeg, image_bytes)
         client, model_name = _build_client()
         image_base64 = base64.b64encode(jpeg_bytes).decode("utf-8")
         
@@ -122,7 +124,7 @@ def extract_attributes(image_bytes: bytes, mime_type: str, filename: str, user_c
         if user_context:
             full_prompt = f"{user_context}\n\n{PROMPT}"
             
-        response = client.chat.completions.create(
+        response = await client.chat.completions.create(
             model=model_name,
             messages=[{"role": "user", "content": [{"type": "text", "text": full_prompt}, {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"}}]}]
         )

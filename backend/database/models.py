@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, JSON, DateTime
+from sqlalchemy import Column, Integer, String, Boolean, JSON, DateTime, Index
 from sqlalchemy.orm import DeclarativeBase
 import datetime
 
@@ -7,9 +7,12 @@ class Base(DeclarativeBase):
 
 class ClothingItem(Base):
     """
-    Simplified SQLAlchemy model for a single-item wardrobe.
+    SQLAlchemy model for a single-item wardrobe with performance indexes.
     """
     __tablename__ = "clothing_items"
+    __table_args__ = (
+        Index("ix_clothing_items_user_verified", "user_id", "is_verified"),
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(String, nullable=False, index=True) 
@@ -25,6 +28,7 @@ class ClothingItem(Base):
     
     is_verified = Column(Boolean, default=False)
     original_ai_output = Column(JSON, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     def to_dict(self):
         return {

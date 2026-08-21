@@ -5,6 +5,7 @@
 
 # Dependencies & Caches (Project-wide)
 **/venv/
+**/.venv/
 **/__pycache__/
 **/.pycache/
 **/*.pyc
