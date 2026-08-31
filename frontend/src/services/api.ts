@@ -1,22 +1,30 @@
+import type {
+  ClothingItem,
+  ItemVerificationPayload,
+  ScanItemResult,
+  BatchScanFileResult,
+  WardrobeStats
+} from '../types';
+
 const BASE_URL = 'http://localhost:8000';
 
 /**
- * Service to handle all API interactions for FitCheck AI.
+ * Service to handle all API interactions for Wardrobe.AI.
  */
 export const api = {
   /**
    * Helper to format image URLs for the frontend
    */
-  getImageUrl(relativePath) {
+  getImageUrl(relativePath: string | undefined | null): string {
     if (!relativePath) return '';
     return `${BASE_URL}/${relativePath}`;
   },
 
   /**
-   * Scans a clothing image and extracts its attributes.
+   * Scans a single clothing image and extracts its attributes.
    * Returns { id, extracted, is_verified }
    */
-  async scanImage(file) {
+  async scanImage(file: File): Promise<{ id: number; extracted: ScanItemResult; is_verified: boolean }> {
     const payload = new FormData();
     payload.append('file', file);
 
@@ -33,10 +41,10 @@ export const api = {
   },
 
   /**
-   * Scans multiple clothing images and extracts their attributes.
-   * Returns an array of results.
+   * Scans multiple clothing images and extracts their attributes in parallel.
+   * Returns an array of results per file.
    */
-  async batchScanImages(files) {
+  async batchScanImages(files: File[]): Promise<BatchScanFileResult[]> {
     const payload = new FormData();
     for (const file of files) {
       payload.append('files', file);
@@ -56,10 +64,10 @@ export const api = {
 
   /**
    * Verifies an item and marks it final in the DB.
-   * @param {number} itemId - The database ID of the item.
-   * @param {Object} verifiedData - The (potentially edited) attributes.
+   * @param itemId - The database ID of the item.
+   * @param verifiedData - The (potentially edited) attributes.
    */
-  async verifyItem(itemId, verifiedData) {
+  async verifyItem(itemId: number, verifiedData: Partial<ItemVerificationPayload> | Partial<ClothingItem>): Promise<ClothingItem> {
     const response = await fetch(`${BASE_URL}/items/${itemId}/verify`, {
       method: 'POST',
       headers: {
@@ -78,7 +86,7 @@ export const api = {
   /**
    * Fetches only verified items for the Wardrobe gallery.
    */
-  async getWardrobe() {
+  async getWardrobe(): Promise<ClothingItem[]> {
     const response = await fetch(`${BASE_URL}/wardrobe`);
     const data = await response.json();
     if (!response.ok) {
@@ -90,7 +98,7 @@ export const api = {
   /**
    * Fetches aggregated wardrobe statistics for the dashboard.
    */
-  async getWardrobeStats() {
+  async getWardrobeStats(): Promise<WardrobeStats> {
     const response = await fetch(`${BASE_URL}/wardrobe/stats`);
     const data = await response.json();
     if (!response.ok) {
@@ -102,7 +110,7 @@ export const api = {
   /**
    * Deletes an item from the archive.
    */
-  async deleteItem(itemId) {
+  async deleteItem(itemId: number): Promise<boolean> {
     const response = await fetch(`${BASE_URL}/items/${itemId}`, {
       method: 'DELETE',
     });
