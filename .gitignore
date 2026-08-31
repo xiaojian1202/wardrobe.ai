@@ -27,3 +27,11 @@ backend/data/
 # OS Clutter
 .DS_Store
 backend/storage/
+
+# Local & Private Documentation
+PRD.md
+DESIGN.md
+TEST.md
+GEMINI.md
+docs/private/
+
