@@ -1,17 +1,20 @@
 import asyncio
 from typing import List, Optional
+import uuid
 
-from fastapi import FastAPI, File, HTTPException, UploadFile, Depends
+from fastapi import FastAPI, File, HTTPException, UploadFile, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 from sqlalchemy import func, desc
 from sqlalchemy.orm import Session
 
-from database.models import Base, ClothingItem, UserPreference
+from database.models import Base, ClothingItem, UserPreference, User
 from database.session import engine, get_db
 from pipeline.extract import ExtractionError, extract_attributes, ExtractionResult
 from pipeline.learning import record_correction, get_user_style_context
+from utils.auth import hash_password, verify_password, create_access_token, decode_access_token
 from utils.config import settings
 from utils.storage import save_image_securely, create_item_thumbnail
 
@@ -25,11 +28,13 @@ Base.metadata.create_all(bind=engine)
 app = FastAPI(
     title="FitCheck AI API",
     version="1.0.0",
-    description="High-performance intelligent fashion scanner with active learning loop.",
+    description="High-performance intelligent fashion scanner with multi-tenant auth and active learning loop.",
 )
 
-# Placeholder user ID for the assignment (until Auth is added)
+# Placeholder guest user ID for backward compatibility
 DEFAULT_USER_ID = "guest_user_123"
+
+security = HTTPBearer(auto_error=False)
 
 app.add_middleware(
     CORSMiddleware,
@@ -43,6 +48,14 @@ app.mount("/storage", StaticFiles(directory="storage"), name="storage")
 
 ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp", "image/heic"}
 
+class RegisterRequest(BaseModel):
+    email: str
+    password: str
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
 class VerificationRequest(BaseModel):
     category: str
     sub_category: str
@@ -50,14 +63,141 @@ class VerificationRequest(BaseModel):
     material: str
     vibe: str
 
+async def get_current_user(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    db: Session = Depends(get_db)
+) -> User:
+    """
+    Extracts the authenticated user from the Bearer JWT token.
+    Falls back to a persistent guest user when unauthenticated for demo / legacy compatibility.
+    """
+    if credentials:
+        token = credentials.credentials
+        payload = decode_access_token(token)
+        if payload and "sub" in payload:
+            user = db.query(User).filter(User.id == payload["sub"]).first()
+            if user:
+                return user
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired authentication token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    # Guest user fallback
+    guest = db.query(User).filter(User.id == DEFAULT_USER_ID).first()
+    if not guest:
+        guest = User(
+            id=DEFAULT_USER_ID,
+            email="guest@fitcheck.ai",
+            hashed_password="guest_disabled_password"
+        )
+        db.add(guest)
+        db.commit()
+        db.refresh(guest)
+    return guest
+
+async def require_auth(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    db: Session = Depends(get_db)
+) -> User:
+    """Strict authentication dependency requiring a valid JWT token."""
+    if not credentials:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication credentials were not provided",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return await get_current_user(credentials=credentials, db=db)
+
 @app.get("/health")
 async def health_check() -> dict[str, str]:
     return {"status": "ok"}
 
+import re
+
+EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$")
+
+def is_valid_email(email: str) -> bool:
+    """Validate email address format following strict RFC-like structure."""
+    if not email or len(email) > 320:
+        return False
+    if not EMAIL_REGEX.match(email):
+        return False
+    domain = email.split("@")[-1]
+    labels = domain.split(".")
+    if len(labels) < 2 or any(len(label) == 0 for label in labels):
+        return False
+    if len(labels[-1]) < 2:
+        return False
+    return True
+
+@app.post("/auth/register")
+async def register(request: RegisterRequest, db: Session = Depends(get_db)):
+    """Register a new user and return JWT access token."""
+    email_clean = request.email.strip().lower()
+    if not is_valid_email(email_clean):
+        raise HTTPException(
+            status_code=400, 
+            detail="A valid email address is required (e.g. user@example.com)."
+        )
+    if len(request.password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters.")
+
+    existing_user = db.query(User).filter(User.email == email_clean).first()
+    if existing_user:
+        raise HTTPException(status_code=409, detail="An account with this email already exists.")
+
+    hashed_pw = hash_password(request.password)
+    new_user = User(
+        id=str(uuid.uuid4()),
+        email=email_clean,
+        hashed_password=hashed_pw
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+
+    token = create_access_token(data={"sub": new_user.id, "email": new_user.email})
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "user": new_user.to_dict()
+    }
+
+@app.post("/auth/login")
+async def login(request: LoginRequest, db: Session = Depends(get_db)):
+    """Authenticate existing user credentials and return JWT token."""
+    email_clean = request.email.strip().lower()
+    if not is_valid_email(email_clean):
+        raise HTTPException(
+            status_code=400,
+            detail="A valid email address is required (e.g. user@example.com)."
+        )
+    user = db.query(User).filter(User.email == email_clean).first()
+    if not user or not verify_password(request.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password."
+        )
+
+    token = create_access_token(data={"sub": user.id, "email": user.email})
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "user": user.to_dict()
+    }
+
+@app.get("/auth/me")
+async def get_me(current_user: User = Depends(require_auth)):
+    """Returns the authenticated user's profile."""
+    return current_user.to_dict()
+
 @app.post("/scan")
 async def scan_image(
     file: UploadFile = File(...), 
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     if not file.filename:
         raise HTTPException(status_code=400, detail="An image file is required.")
@@ -68,9 +208,9 @@ async def scan_image(
 
     image_hash, relative_path = save_image_securely(contents, file.filename)
 
-    # 1. Deduplication
+    # 1. Deduplication per user
     existing_items = db.query(ClothingItem).filter(
-        ClothingItem.user_id == DEFAULT_USER_ID,
+        ClothingItem.user_id == current_user.id,
         ClothingItem.image_hash == image_hash
     ).all()
     if existing_items:
@@ -80,7 +220,7 @@ async def scan_image(
         }
 
     # 2. FETCH LEARNED CONTEXT (The 'Learning Loop' at work)
-    user_style_notes = get_user_style_context(db, DEFAULT_USER_ID)
+    user_style_notes = get_user_style_context(db, current_user.id)
 
     # 3. Non-blocking Async AI Extraction with Context
     try:
@@ -104,11 +244,11 @@ async def scan_image(
             
         raise HTTPException(status_code=422, detail=msg)
 
-    # 4. Persist items
+    # 4. Persist items for current user
     created_items = []
     for item_data in extraction.items:
         new_item = ClothingItem(
-            user_id=DEFAULT_USER_ID,
+            user_id=current_user.id,
             image_hash=image_hash,
             file_path=relative_path,
             category=item_data.category,
@@ -135,15 +275,16 @@ async def scan_image(
 @app.post("/batch-scan")
 async def batch_scan_images(
     files: List[UploadFile] = File(...), 
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """
-    Scans multiple clothing images in parallel with bounded concurrency.
+    Scans multiple clothing images in parallel with bounded concurrency and user isolation.
     """
     if not files:
         return []
 
-    user_style_notes = get_user_style_context(db, DEFAULT_USER_ID)
+    user_style_notes = get_user_style_context(db, current_user.id)
     semaphore = asyncio.Semaphore(MAX_BATCH_CONCURRENCY)
 
     # Read and hash files asynchronously first
@@ -171,9 +312,9 @@ async def batch_scan_images(
         if "error" in item_info:
             return {"filename": item_info["filename"], "status": "error", "detail": item_info["error"]}
 
-        # Check for existing duplicate
+        # Check for existing duplicate for current user
         existing_items = db.query(ClothingItem).filter(
-            ClothingItem.user_id == DEFAULT_USER_ID,
+            ClothingItem.user_id == current_user.id,
             ClothingItem.image_hash == item_info["image_hash"]
         ).all()
         if existing_items:
@@ -223,7 +364,7 @@ async def batch_scan_images(
             created_for_res = []
             for item_data in res["extraction"].items:
                 new_item = ClothingItem(
-                    user_id=DEFAULT_USER_ID,
+                    user_id=current_user.id,
                     image_hash=res["image_hash"],
                     file_path=res["relative_path"],
                     category=item_data.category,
@@ -269,20 +410,21 @@ async def batch_scan_images(
 async def verify_item(
     item_id: int, 
     request: VerificationRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """
-    Saves user truth and records corrections to improve future scans.
+    Saves user truth and records corrections to improve future scans for current user.
     """
     item = db.query(ClothingItem).filter(
         ClothingItem.id == item_id,
-        ClothingItem.user_id == DEFAULT_USER_ID
+        ClothingItem.user_id == current_user.id
     ).first()
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
 
     # Record correction in active learning loop
-    record_correction(db, DEFAULT_USER_ID, item_id, request.model_dump())
+    record_correction(db, current_user.id, item_id, request.model_dump())
 
     # Update attributes
     item.category = request.category
@@ -297,26 +439,35 @@ async def verify_item(
     return {"status": "verified", "item": item.to_dict()}
 
 @app.get("/wardrobe", response_model=List[dict])
-async def get_verified_wardrobe(db: Session = Depends(get_db)):
+async def get_verified_wardrobe(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     items = db.query(ClothingItem).filter(
-        ClothingItem.user_id == DEFAULT_USER_ID,
+        ClothingItem.user_id == current_user.id,
         ClothingItem.is_verified == True
     ).order_by(ClothingItem.id.desc()).all()
     return [item.to_dict() for item in items]
 
 @app.get("/debug/preferences")
-async def get_learned_preferences(db: Session = Depends(get_db)):
-    """Debug endpoint to inspect active learned preferences."""
-    prefs = db.query(UserPreference).filter(UserPreference.user_id == DEFAULT_USER_ID).all()
+async def get_learned_preferences(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Debug endpoint to inspect active learned preferences for current user."""
+    prefs = db.query(UserPreference).filter(UserPreference.user_id == current_user.id).all()
     return prefs
 
 @app.get("/wardrobe/stats")
-async def get_wardrobe_stats(db: Session = Depends(get_db)):
+async def get_wardrobe_stats(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     """
-    Aggregates wardrobe statistics using native SQL COUNT and GROUP BY queries.
+    Aggregates wardrobe statistics using native SQL COUNT and GROUP BY queries per user.
     """
     total_count = db.query(func.count(ClothingItem.id)).filter(
-        ClothingItem.user_id == DEFAULT_USER_ID,
+        ClothingItem.user_id == current_user.id,
         ClothingItem.is_verified == True
     ).scalar() or 0
 
@@ -328,7 +479,7 @@ async def get_wardrobe_stats(db: Session = Depends(get_db)):
         ClothingItem.vibe, 
         func.count(ClothingItem.id).label("cnt")
     ).filter(
-        ClothingItem.user_id == DEFAULT_USER_ID,
+        ClothingItem.user_id == current_user.id,
         ClothingItem.is_verified == True,
         ClothingItem.vibe.isnot(None),
         ClothingItem.vibe != ""
@@ -339,7 +490,7 @@ async def get_wardrobe_stats(db: Session = Depends(get_db)):
         ClothingItem.color, 
         func.count(ClothingItem.id).label("cnt")
     ).filter(
-        ClothingItem.user_id == DEFAULT_USER_ID,
+        ClothingItem.user_id == current_user.id,
         ClothingItem.is_verified == True,
         ClothingItem.color.isnot(None),
         ClothingItem.color != ""
@@ -350,7 +501,7 @@ async def get_wardrobe_stats(db: Session = Depends(get_db)):
         ClothingItem.category, 
         func.count(ClothingItem.id).label("cnt")
     ).filter(
-        ClothingItem.user_id == DEFAULT_USER_ID,
+        ClothingItem.user_id == current_user.id,
         ClothingItem.is_verified == True,
         ClothingItem.category.isnot(None),
         ClothingItem.category != ""
@@ -364,11 +515,15 @@ async def get_wardrobe_stats(db: Session = Depends(get_db)):
     }
 
 @app.delete("/items/{item_id}")
-async def delete_item(item_id: int, db: Session = Depends(get_db)):
-    """Deletes an item from the database."""
+async def delete_item(
+    item_id: int, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Deletes an item from the database with tenant validation."""
     item = db.query(ClothingItem).filter(
         ClothingItem.id == item_id,
-        ClothingItem.user_id == DEFAULT_USER_ID
+        ClothingItem.user_id == current_user.id
     ).first()
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")

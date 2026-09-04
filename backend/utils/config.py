@@ -20,9 +20,9 @@ class Settings(BaseSettings):
     )
 
     # TritonAI Gateway Configuration (Will be pulled from .env)
-    triton_api_key: str 
-    triton_base_url: str
-    triton_model: str
+    triton_api_key: str = "placeholder_key"
+    triton_base_url: str = "https://api.tritonai.ucsd.edu/v1/"
+    triton_model: str = "gpt-4o"
 
     # API Configuration
     api_host: str = "0.0.0.0"
@@ -36,6 +36,11 @@ class Settings(BaseSettings):
     
     # Database Configuration
     database_url: str = "sqlite:///data/fitcheck.db"
+
+    # JWT Authentication Configuration
+    jwt_secret: str = "fitcheck-secret-key-change-in-production-env"
+    jwt_algorithm: str = "HS256"
+    jwt_expiration_minutes: int = 60 * 24 * 7  # 7 days
 
 # Single instance of settings for application-wide use
 settings = Settings()

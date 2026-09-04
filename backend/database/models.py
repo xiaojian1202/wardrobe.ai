@@ -1,9 +1,28 @@
+import uuid
+import datetime
 from sqlalchemy import Column, Integer, String, Boolean, JSON, DateTime, Index
 from sqlalchemy.orm import DeclarativeBase
-import datetime
 
 class Base(DeclarativeBase):
     pass
+
+class User(Base):
+    """
+    User model for multi-tenant authentication and profile management.
+    """
+    __tablename__ = "users"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    email = Column(String, unique=True, nullable=False, index=True)
+    hashed_password = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "email": self.email,
+            "created_at": self.created_at.isoformat() if self.created_at else None
+        }
 
 class ClothingItem(Base):
     """
