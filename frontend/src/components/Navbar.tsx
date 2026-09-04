@@ -76,38 +76,40 @@ export default function Navbar() {
               <button
                 type="button"
                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                className="flex items-center gap-2 py-2 px-3 rounded-2xl bg-soft-bg hover:bg-slate-100 dark:hover:bg-slate-800 text-soft-fg text-sm font-semibold border border-slate-200/60 dark:border-slate-800 transition-all shadow-sm"
+                className="flex items-center gap-2.5 py-2 px-3.5 rounded-2xl bg-soft-bg shadow-extruded-sm hover:shadow-extruded text-soft-fg text-sm font-semibold border border-white/20 dark:border-white/5 transition-all outline-none focus-visible:ring-2 focus-visible:ring-soft-accent"
                 aria-expanded={isDropdownOpen}
                 aria-haspopup="true"
               >
-                <div className="w-7 h-7 rounded-full bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-xs uppercase">
+                <div className="w-7 h-7 rounded-xl bg-soft-accent/15 text-soft-accent flex items-center justify-center font-extrabold font-display text-xs uppercase shadow-inset-sm">
                   {user.email.charAt(0)}
                 </div>
-                <span className="max-w-[110px] truncate text-xs sm:text-sm font-medium hidden sm:inline-block">
+                <span className="max-w-[110px] truncate text-xs sm:text-sm font-medium font-body hidden sm:inline-block">
                   {user.email.split('@')[0]}
                 </span>
                 <ChevronDown className="w-3.5 h-3.5 text-soft-muted" />
               </button>
 
               {isDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-52 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl py-1.5 z-50 animate-in fade-in zoom-in-95 duration-150">
-                  <div className="px-4 py-2 border-b border-slate-100 dark:border-slate-800">
-                    <p className="text-xs text-slate-400 font-medium">Signed in as</p>
-                    <p className="text-xs font-semibold text-slate-900 dark:text-slate-100 truncate mt-0.5">
+                <div className="absolute right-0 mt-3 w-56 bg-soft-bg luxury-glass border border-white/40 dark:border-white/10 rounded-2xl shadow-extruded py-2 z-50 animate-in fade-in zoom-in-95 duration-150 text-soft-fg">
+                  <div className="px-4 py-2.5 border-b border-soft-muted/15">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-soft-muted font-display">Signed in as</p>
+                    <p className="text-xs font-semibold text-soft-fg truncate mt-0.5 font-body">
                       {user.email}
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsDropdownOpen(false);
-                      logout();
-                    }}
-                    className="w-full flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors text-left"
-                  >
-                    <LogOut className="w-4 h-4" />
-                    Sign Out
-                  </button>
+                  <div className="p-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsDropdownOpen(false);
+                        logout();
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs sm:text-sm font-bold font-display text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 rounded-xl transition-colors text-left"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      Sign Out
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -115,7 +117,7 @@ export default function Navbar() {
             <button
               type="button"
               onClick={() => openAuthModal('login')}
-              className="flex items-center gap-2 py-2 px-4 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-bold shadow-md shadow-indigo-500/20 transition-all active:scale-[0.98]"
+              className="flex items-center gap-2 py-2.5 px-5 rounded-2xl bg-soft-accent hover:bg-soft-accent-light text-soft-accent-fg text-xs sm:text-sm font-bold font-display uppercase tracking-wider shadow-extruded-sm hover:shadow-extruded active:scale-[0.98] transition-all outline-none focus-visible:ring-2 focus-visible:ring-soft-accent"
             >
               <LogIn className="w-4 h-4" />
               <span>Sign In</span>
